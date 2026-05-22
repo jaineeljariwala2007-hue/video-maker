@@ -366,8 +366,8 @@
     </div>
     <div class="form-group">
       <label>ANTHROPIC API KEY</label>
-      <input type="text" id="apiKeyInput" placeholder="sk-ant-api03-…" autocomplete="off">
-      <div class="hint">Your key is stored only in your browser's localStorage. It's never sent anywhere except directly to api.anthropic.com.</div>
+      <input type="text" id="apiKeyInput" placeholder="sk-…" autocomplete="off">
+      <div class="hint">Your key is stored only in your browser's localStorage. It's never sent anywhere except directly to api.openai.com.</div>
       <div class="key-saved" id="keySaved">✓ Key saved</div>
     </div>
     <hr class="divider">
@@ -375,7 +375,7 @@
       <strong style="color:var(--text);">How it works</strong><br>
       • Images generated via <strong>Pollinations.ai</strong> (free, no key)<br>
       • Page scraping via <strong>Jina Reader</strong> (free, no key)<br>
-      • Prompt engineering via <strong>Claude claude-sonnet-4-20250514</strong> (your key)
+      • Prompt engineering via <strong>OpenAI gpt-4o</strong> (your key)
     </div>
     <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
       <button class="btn btn-ghost btn-sm" onclick="closeSettings()">Cancel</button>
@@ -542,7 +542,7 @@ function renderSteps() {
 // ── Main generation orchestrator ──────────────────────────────────────────────
 async function startGeneration() {
   if (!state.apiKey) {
-    showToast('Please add your Anthropic API key in Settings ⚙', 'error');
+    showToast('Please add your OpenAI API key in Settings ⚙', 'error');
     openSettings();
     return;
   }
@@ -594,47 +594,42 @@ async function getProductInfo() {
   return document.getElementById('textInput').value.trim();
 }
 
-// ── Step 2: Claude prompt generation ─────────────────────────────────────────
+// ── Step 2: OpenAI prompt generation ─────────────────────────────────────────
 async function callClaude(systemPrompt, userContent) {
-  const messages = [];
+  const userMessage = { role: 'user', content: [] };
 
   if (state.inputMode === 'upload' && state.uploadedDataURL) {
-    // Use vision
-    const base64 = state.uploadedDataURL.split(',')[1];
-    const mediaType = state.uploadedDataURL.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-        { type: 'text', text: userContent }
-      ]
+    userMessage.content.push({
+      type: 'image_url',
+      image_url: { url: state.uploadedDataURL }
     });
+    userMessage.content.push({ type: 'text', text: userContent });
   } else {
-    messages.push({ role: 'user', content: userContent });
+    userMessage.content = userContent;
   }
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'x-api-key': state.apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-calls': 'true'
+      'Authorization': `Bearer ${state.apiKey}`,
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'gpt-4o',
       max_tokens: 2048,
-      system: systemPrompt,
-      messages
+      messages: [
+        { role: 'system', content: systemPrompt },
+        userMessage
+      ]
     })
   });
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Claude API error ${resp.status}`);
+    throw new Error(err.error?.message || `OpenAI API error ${resp.status}`);
   }
   const data = await resp.json();
-  return data.content[0].text;
+  return data.choices[0].message.content;
 }
 
 // ── PHOTO AD generation ───────────────────────────────────────────────────────
@@ -850,7 +845,7 @@ function copyRunwayPrompt() {
 // Show settings prompt if no API key
 if (!state.apiKey) {
   setTimeout(() => {
-    showToast('Add your Anthropic API key in Settings ⚙ to get started', 'info');
+    showToast('Add your OpenAI API key in Settings ⚙ to get started', 'info');
   }, 800);
 }
 </script>
