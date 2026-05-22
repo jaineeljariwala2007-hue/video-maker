@@ -636,7 +636,7 @@ async function callClaude(systemPrompt, userContent) {
 async function generatePhotoAd() {
   initSteps([
     { label: 'Gathering product information' },
-    { label: 'Writing ad creative prompts (Claude)' },
+    { label: 'Writing ad creative prompts (OpenAI)' },
     { label: 'Generating portrait 9:16 image' },
     { label: 'Generating square 1:1 image' },
     { label: 'Generating landscape 16:9 image' }
@@ -645,7 +645,7 @@ async function generatePhotoAd() {
   setStep(0, 'active');
   const productInfo = await getProductInfo();
 
-  setStep(1, 'active', 'Asking Claude to write Pollinations prompts…');
+  setStep(1, 'active', 'Asking OpenAI to write Pollinations prompts…');
   const systemPrompt = `You are an expert ad creative director and prompt engineer.
 Given product information, write 3 highly descriptive Pollinations.ai image generation prompts for photo advertisements.
 Each prompt should result in a stunning, scroll-stopping ad image.
@@ -669,7 +669,7 @@ Each prompt should include: product description, mood/aesthetic, lighting, color
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     adData = JSON.parse(jsonMatch[0]);
   } catch {
-    throw new Error('Could not parse Claude response as JSON');
+    throw new Error('Could not parse OpenAI response as JSON');
   }
   setStep(1, 'done', `Brand: ${adData.brand} · Tagline: ${adData.tagline}`);
 
@@ -727,7 +727,7 @@ Each prompt should include: product description, mood/aesthetic, lighting, color
 async function generateVideoAd() {
   initSteps([
     { label: 'Gathering product information' },
-    { label: 'Writing 5-scene video script (Claude)' },
+    { label: 'Writing 5-scene video script (OpenAI)' },
     { label: 'Generating scene visuals (Pollinations)' },
     { label: 'Building storyboard' }
   ]);
@@ -768,7 +768,7 @@ Make all 5 scenes. Keep image_prompts vivid and specific.`;
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     adData = JSON.parse(jsonMatch[0]);
   } catch {
-    throw new Error('Could not parse Claude response as JSON');
+    throw new Error('Could not parse OpenAI response as JSON');
   }
   setStep(1, 'done', `${adData.scenes.length} scenes scripted · ${adData.duration}s ad`);
 
