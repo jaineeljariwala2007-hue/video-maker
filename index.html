@@ -826,12 +826,16 @@ Make all 5 scenes. Keep image_prompts vivid and specific.`;
     <div class="output-actions">
       <button class="btn btn-ghost btn-sm" onclick="goTo('inputScreen')">← Back</button>
       <button class="btn btn-secondary btn-sm" onclick="copyRunwayPrompt()">📋 Copy Runway Prompt</button>
+      <button class="btn btn-secondary btn-sm" id="downloadVideoBtn" onclick="downloadVideoSlideshow()">⬇ Download Video</button>
       <button class="btn btn-primary btn-sm" onclick="startGeneration()">🔄 Regenerate</button>
     </div>
   `;
 
-  setStep(3, 'done', 'Storyboard complete!');
-  showToast('Your video storyboard is ready!', 'success');
+  // Store scene images for video export
+  window._sceneImages = sceneImages;
+
+  setStep(3, 'done', 'Storyboard complete! Click "Download Video" to export.');
+  showToast('Storyboard ready! Hit "Download Video" to get the file.', 'success');
 }
 
 function copyRunwayPrompt() {
@@ -839,6 +843,98 @@ function copyRunwayPrompt() {
   if (text) {
     navigator.clipboard.writeText(text).then(() => showToast('Runway prompt copied!', 'success'));
   }
+}
+
+async function downloadVideoSlideshow() {
+  const btn = document.getElementById('downloadVideoBtn');
+  const scenes = window._sceneImages;
+  if (!scenes || !scenes.length) { showToast('No scenes to export', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span> Building video…';
+
+  try {
+    const W = 1024, H = 576;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, {
+      mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9' : 'video/webm'
+    });
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+    recorder.start();
+
+    for (const scene of scenes) {
+      // Load image
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.crossOrigin = 'anonymous';
+        i.onload = () => res(i);
+        i.onerror = () => res(null);
+        i.src = scene.imageUrl;
+      });
+
+      const secPerScene = scene.duration_sec || 6;
+      const frames = secPerScene * 30;
+
+      for (let f = 0; f < frames; f++) {
+        ctx.clearRect(0, 0, W, H);
+        if (img) {
+          ctx.drawImage(img, 0, 0, W, H);
+        } else {
+          ctx.fillStyle = '#0a0a0f';
+          ctx.fillRect(0, 0, W, H);
+        }
+
+        // Scene label overlay
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, H - 70, W, 70);
+        ctx.fillStyle = '#a78bfa';
+        ctx.font = 'bold 13px Inter, sans-serif';
+        ctx.fillText(`SCENE ${scene.number}  ·  ${scene.duration_sec}s`, 20, H - 46);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.fillText(scene.title, 20, H - 22);
+
+        // Fade in / fade out
+        const fadeFrames = 15;
+        let alpha = 0;
+        if (f < fadeFrames) alpha = 1 - f / fadeFrames;
+        else if (f > frames - fadeFrames) alpha = 1 - (frames - f) / fadeFrames;
+        if (alpha > 0) {
+          ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+          ctx.fillRect(0, 0, W, H);
+        }
+
+        await new Promise(r => setTimeout(r, 0)); // yield to browser
+      }
+    }
+
+    recorder.stop();
+
+    await new Promise(r => { recorder.onstop = r; });
+
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ad-video.webm';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    showToast('Video downloaded!', 'success');
+  } catch (err) {
+    showToast('Video export failed: ' + err.message, 'error');
+    console.error(err);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '⬇ Download Video';
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
